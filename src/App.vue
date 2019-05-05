@@ -183,144 +183,211 @@
         </li>
       </ul>
     </jqx-menu>
-    <jqx-layout theme="metrodark" ref="layout" @resize="onResize()" :width="jqxLayout.width" :layout="jqxLayout.layout">
+    <jqx-docking-layout theme="metrodark" ref="layout" :width="jqxLayout.width" :height="jqxLayout.height" :layout="jqxLayout.layout">
+        <div data-container="ResourcePanel">
+          <div id="resource-controller" style="display: flex; height: 40px;">
+            <button type="button" id="add-file-button"></button>
+            <button type="button" id="add-folder-button"></button>
+            <input type="file" accept="image/png" multiple id="file-input" style="display: none;" />
+            <button type="button" id="remove-button"></button>
+          </div>
+          <div style="position: absolute; left:0; bottom: 500px; top: 40px; right: 0;">
+            <div id="resource-manager"></div>
+          </div>
+          <div style="position: absolute; left:0; bottom: 0; right: 0; height: 500px;">
+            <img id="resource-image-preview" style="height: 99%;"/>
+          </div>
+        </div>
         <div data-container="Document1Panel">
           
         </div>
-        <div data-container="Document2Panel">Document 2 content</div>
-        <div data-container="ErrorListPanel">List of errors</div>
         <div data-container="OutputPanel">Output</div>
         <div data-container="SolutionExplorerPanel"></div>
         <div data-container="PropertiesPanel">List of properties</div>
-    </jqx-layout>
-    <jqx-tree theme="metrodark" :width="tree.width" :height="tree.height" :source="tree.treeSource">
-          </jqx-tree>
+    </jqx-docking-layout>
+    <input-dialog ref="inputDialog"></input-dialog>
+    <confirm-dialog ref="confirmDialog"></confirm-dialog>
   </div>
 </template>
 
 <script lang="ts">
+/// <reference path="./jqwidgets.d.ts" />
+
+import $ from "jquery";
 import { Component, Prop, Vue } from "vue-property-decorator";
 import Axios, { AxiosInstance } from "axios";
 import urljoin from "url-join";
 import JqxMenu from "jqwidgets-scripts/jqwidgets-vue/vue_jqxmenu.vue";
-import JqxLayout from "jqwidgets-scripts/jqwidgets-vue/vue_jqxlayout.vue";
-import JqxTree from "jqwidgets-scripts/jqwidgets-vue/vue_jqxtree.vue";
+import JqxDockingLayout from "jqwidgets-scripts/jqwidgets-vue/vue_jqxdockinglayout.vue";
+import JqxWindow from "jqwidgets-scripts/jqwidgets-vue/vue_jqxwindow.vue";
+import JqxButton from "jqwidgets-scripts/jqwidgets-vue/vue_jqxbuttons.vue";
+import {IResourceItem, ResourceManagerView, DefaultResourceManagerModel} from "./components/ResourceManager";
+import InputDialog from "./components/InputDialog.vue";
+import ConfirmDialog from "./components/ConfirmDialog.vue";
 
 @Component({
   components: {
     "jqx-menu": JqxMenu,
-    "jqx-layout": JqxLayout,
-    "jqx-tree": JqxTree
+    "jqx-docking-layout": JqxDockingLayout,
+    "jqx-window": JqxWindow,
+    "jqx-button": JqxButton,
+    "input-dialog": InputDialog,
+    "confirm-dialog": ConfirmDialog
   }
 })
 export default class App extends Vue {
-  private readonly apiBaseUrl: string = "http://localhost:8080/trpgfate-api/";
-  private userId: number = -1;
-  private avatarUrl: string = "";
-  private axiosInst: AxiosInstance;
-  private tree: any = {
-    width: 200,
-    height: 600,
-    treeSource: [
-        {
-            label: 'Mail', expanded: true,
-            items:
-                [
-                    { label: 'Calendar' },
-                    { label: 'Contacts', selected: true }
-                ]
-        },
-        {
-            label: 'Inbox', expanded: true,
-            items:
-                [
-                    { label: 'Admin' },
-                    { label: 'Corporate' },
-                    { label: 'Finance' },
-                    { label: 'Other' },
-                ]
-        },
-        { label: 'Deleted Items' },
-        { label: 'Notes' },
-        { label: 'Settings' },
-        { label: 'Favorites' }
-    ]
-  }
-  private jqxLayout: any = {
+  readonly apiBaseUrl: string = "http://localhost:8080/trpgfate-api/";
+  userId: number = -1;
+  avatarUrl: string = "";
+  axiosInst: AxiosInstance;
+  resourceManager: ResourceManagerView = new ResourceManagerView();
+  resourceModel: DefaultResourceManagerModel = new DefaultResourceManagerModel();
+
+  jqxLayout: any = {
     width: "100%",
+    height: "1080px",
     layout: [
       {
         type: "layoutGroup",
         orientation: "horizontal",
         items: [
           {
-            type: "layoutGroup",
-            orientation: "vertical",
+            type: "tabbedGroup",
+            width: "20%",
+            items: [
+              {
+                type: "layoutPanel",
+                title: "资源面板",
+                contentContainer: "ResourcePanel",
+                initContent: () => {
+                  this.resourceManager.initView('#resource-manager');
+                  this.resourceManager.setModel(this.resourceModel);
+                  this.resourceManager.addSelectEventListener(e => {
+                    let data = e.selectedItem.getData();
+                    if (data != null) {
+                      let fileReader = new FileReader();
+                      fileReader.readAsDataURL(data);
+                      fileReader.onload = (e: any) => {
+                        ($('#resource-image-preview').get(0) as HTMLImageElement).src = e.target.result;
+                      };
+                    }
+                  });
+                  jqwidgets.createInstance('#resource-controller>#add-file-button', 'jqxButton', { width: 120, height: 40, value: '导入', theme:'metrodark' });
+                  jqwidgets.createInstance('#resource-controller>#add-folder-button', 'jqxButton', { width: 120, height: 40, value: '创建文件夹', theme:'metrodark' });
+                  jqwidgets.createInstance('#resource-controller>#remove-button', 'jqxButton', { width: 120, height: 40, value: '删除', theme:'metrodark' });
+                  $('#resource-controller>#add-file-button').click(() => {
+                    $('#resource-controller>#file-input').click();
+                  });
+                  $('#resource-controller>#file-input').change(event => {
+                    let item = this.resourceManager.getSelectedItem();
+                    if (item != null) {
+                      if (item.getData() != null) {
+                        let folder = item.getParent() as IResourceItem;
+                        let files = <FileList>(<any>event.target).files;
+                        for (let i = 0; i < files.length; ++i) {
+                          let file = files.item(i);
+                          if (file != null) {
+                            this.resourceModel.attachResource(folder.getFullPath(), file.name, 'file-image', file);
+                          }
+                        }
+                      } else {
+                        let files = <FileList>(<any>event.target).files;
+                        for (let i = 0; i < files.length; ++i) {
+                          let file = files.item(i);
+                          if (file != null) {
+                            this.resourceModel.attachResource(item.getFullPath(), file.name, 'file-image', file);
+                          }
+                        }
+                      }
+                    } else {
+                      let files = <FileList>(<any>event.target).files;
+                      for (let i = 0; i < files.length; ++i) {
+                        let file = files.item(i);
+                        if (file != null) {
+                          this.resourceModel.attachResource("custom_resource", file.name, 'file-image', file);
+                        }
+                      }
+                    }
+                  });
+                  $('#resource-controller>#add-folder-button').click(() => {
+                    let inputDialog = this.$refs['inputDialog'] as InputDialog;
+                    let promise = inputDialog.show('文件夹名：', '创建文件夹', '未命名文件夹');
+                    if (promise != null) {
+                      promise.then(t => {
+                        let text = t as string;
+                        if (text == '') {
+                          let confirmDialog = this.$refs['confirmDialog'] as ConfirmDialog;
+                          confirmDialog.show("文件夹名不能为空", "警告", "warning");
+                          return;
+                        }
+                        let item = this.resourceManager.getSelectedItem();
+                        if (item != null) {
+                          if (item.getData() != null) {
+                            let folder = item.getParent() as IResourceItem;
+                            this.resourceModel.createFolder(folder.getFullPath(), text);
+                          } else {
+                            this.resourceModel.createFolder(item.getFullPath(), text);
+                          }
+                        } else {
+                          this.resourceModel.createFolder("custom_resource", text);
+                        }
+                      }).catch(() => {});
+                    }
+                  });
+                  $('#resource-controller>#remove-button').click(() => {
+                    let selectedPath = this.resourceManager.getSelectedItemPath();
+                    if (selectedPath != null) {
+                      this.resourceModel.deleteNode(selectedPath);
+                    }
+                  });
+                }
+              }
+            ]
+          },
+          {
+            type: "documentGroup",
             width: "60%",
             items: [
               {
-                type: "documentGroup",
+                type: "documentPanel",
+                title: "故事场景",
+                contentContainer: "Document1Panel",
+              }
+            ]
+          },
+          {
+            type: "layoutGroup",
+            orientation: "vertical",
+            width: "20%",
+            items: [
+              {
+                type: "tabbedGroup",
                 height: "50%",
-                minHeight: "25%",
                 items: [
                   {
-                    type: "documentPanel",
-                    title: "Document 1",
-                    contentContainer: "Document1Panel"
-                  },
-                  {
-                    type: "documentPanel",
-                    title: "Document 2",
-                    contentContainer: "Document2Panel"
+                    type: "layoutPanel",
+                    title: "Solution Explorer",
+                    contentContainer: "SolutionExplorerPanel",
                   }
                 ]
               },
               {
                 type: "tabbedGroup",
-                height: "500px",
-                pinnedHeight: "10%",
+                height: "50%",
                 items: [
                   {
                     type: "layoutPanel",
-                    title: "Error List",
-                    contentContainer: "ErrorListPanel"
-                  },
-                  {
-                    type: "layoutPanel",
-                    title: "Output",
-                    contentContainer: "OutputPanel",
-                    selected: true
+                    title: "Properties",
+                    contentContainer: "PropertiesPanel"
                   }
                 ]
-              }
+              },
             ]
           },
-          {
-            type: "tabbedGroup",
-            width: "40%",
-            items: [
-              {
-                type: "layoutPanel",
-                title: "Solution Explorer",
-                contentContainer: "SolutionExplorerPanel"
-              },
-              {
-                type: "layoutPanel",
-                title: "Properties",
-                contentContainer: "PropertiesPanel"
-              }
-            ]
-          }
         ]
       }
     ]
   };
-
-  private onResize() {
-    // Do something...
-    console.log(this.$refs.layout);
-    //(<any>this.$refs.layout).refresh();
-  }
 
   constructor() {
     super();
@@ -413,8 +480,8 @@ export default class App extends Vue {
 }
 
 #avatar-container {
-  width: 40px;
-  height: 40px;
+  width: 55px;
+  height: 55px;
 }
 
 #avatar-container img {
