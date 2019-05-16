@@ -59,32 +59,6 @@
             <li>
               <a href="#Government">粘贴</a>
             </li>
-            <li>
-              Software Solutions
-              <ul style="width: 220px;">
-                <li>
-                  <a href="#ConsumerPhoto">Consumer photo and video</a>
-                </li>
-                <li>
-                  <a href="#Mobile">Mobile</a>
-                </li>
-                <li>
-                  <a href="#RIA">Rich Internet applications</a>
-                </li>
-                <li>
-                  <a href="#TechnicalCommunication">Technical communication</a>
-                </li>
-                <li>
-                  <a href="#Training">Training and eLearning</a>
-                </li>
-                <li>
-                  <a href="#WebConferencing">Web conferencing</a>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <a href="#">All industries and solutions</a>
-            </li>
           </ul>
         </li>
         <li>
@@ -117,27 +91,6 @@
             <li>
               <a href="#CustomerService">属性</a>
             </li>
-            <li>
-              <a href="#KB">Knowledge base</a>
-            </li>
-            <li>
-              <a href="#Books">Books</a>
-            </li>
-            <li>
-              <a href="#Training">Training and certification</a>
-            </li>
-            <li>
-              <a href="#SupportPrograms">Support programs</a>
-            </li>
-            <li>
-              <a href="#Forums">Forums</a>
-            </li>
-            <li>
-              <a href="#Documentation">Documentation</a>
-            </li>
-            <li>
-              <a href="#Updates">Updates</a>
-            </li>
           </ul>
         </li>
         <li>
@@ -145,39 +98,6 @@
           <ul style="width: 200px;">
             <li>
               <a href="#Designers">关于</a>
-            </li>
-            <li>
-              <a href="#Developers">Developers</a>
-            </li>
-            <li>
-              <a href="#Educators">Educators and students</a>
-            </li>
-            <li>
-              <a href="#Partners">Partners</a>
-            </li>
-            <li type="separator"></li>
-            <li>
-              By resource
-              <ul>
-                <li>
-                  <a href="#Labs">Labs</a>
-                </li>
-                <li>
-                  <a href="#TV">TV</a>
-                </li>
-                <li>
-                  <a href="#Forums">Forums</a>
-                </li>
-                <li>
-                  <a href="#Exchange">Exchange</a>
-                </li>
-                <li>
-                  <a href="#Blogs">Blogs</a>
-                </li>
-                <li>
-                  <a href="#Experience Design">Experience Design</a>
-                </li>
-              </ul>
             </li>
           </ul>
         </li>
@@ -219,6 +139,9 @@ import {PropertyEditor,IPropertyContainer,IProperty} from './components/Property
 
 class PropertyEditorTestCase extends IPropertyContainer {
   private _x: number = 0;
+  private _y: number = 0;
+
+  private _color: string = '#FFFFFF';
 
   get x(): number {
     return this._x;
@@ -230,8 +153,32 @@ class PropertyEditorTestCase extends IPropertyContainer {
     this.propertyUpdated('x', oldVal, val);
   }
 
+  get y(): number {
+    return this._y;
+  }
+
+  set y(val: number) {
+    let oldVal = this._y;
+    this._y = val;
+    this.propertyUpdated('y', oldVal, val);
+  }
+
+  get color(): string {
+    return this._color;
+  }
+
+  set color(val: string) {
+    let oldVal = this._color;
+    this._color = val;
+    this.propertyUpdated('color', oldVal, val);
+  }
+
   getWatchedProperties(): IProperty[] {
-    return [ { propertyName: 'x', type: 'number', showName: 'X值' } ];
+    return [
+      { propertyName: 'x', type: 'number', showName: 'X', groupName: '位置' },
+      { propertyName: 'y', type: 'number', showName: 'Y', groupName: '位置' },
+      { propertyName: 'color', type: 'color', showName: '颜色'},
+    ];
   }
 }
 
@@ -294,7 +241,7 @@ export default class App extends Vue {
             items: [
               {
                 type: "tabbedGroup",
-                height: "50%",
+                height: "35%",
                 items: [
                   {
                     type: "layoutPanel",
@@ -305,7 +252,7 @@ export default class App extends Vue {
               },
               {
                 type: "tabbedGroup",
-                height: "50%",
+                height: "65%",
                 items: [
                   {
                     type: "layoutPanel",

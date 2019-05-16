@@ -98,15 +98,15 @@ export class PropertyEditor {
             altRows: true,
             autoRowHeight: true,
             editSettings: {
-                saveOnPageChange: true, saveOnBlur: true,
+                saveOnPageChange: true, saveOnBlur: false,
                 saveOnSelectionChange: true, cancelOnEsc: true,
                 saveOnEnter: true, editOnDoubleClick: true, editOnF2: true
             },
             editable: true,
             columns: [
-                { text: '属性名', editable: false, columnType: 'none', dataField: 'property', width: 200 },
+                { text: '属性名', editable: false, columnType: 'none', dataField: 'property', width: '35%' },
                 {
-                    text: '值', dataField: 'value', width: 230, columnType: 'custom',
+                    text: '值', dataField: 'value', width: '65%', columnType: 'custom',
                     // creates an editor depending on the 'type' value.
                     createEditor: (rowKey: any, cellvalue: any, editor: any, cellText: any, width: any, height: any): void => {
                         let component = this.gridComponent as jqwidgets.jqxTreeGrid;
@@ -222,7 +222,7 @@ export class PropertyEditor {
         let records = row.records;
         // update the nested properties when a parent value is changed.
         if (records.length > 0) {
-            let values = args.value.split(',');
+            let values = args.value.toString().split(',');
             for (let i = 0; i < values.length; i++) {
                 let value = $.trim(values[i]);
                 let rowKey = component.getKey(records[i]);
@@ -254,16 +254,16 @@ export class PropertyEditor {
                     let rawObj: any = this.watchTarget;
                     switch (row['type']) {
                         case "number":
-                            let num = parseFloat(args.value);
+                            let num = parseFloat(args.value.toString());
                             rawObj[row['mappingName']] = !isNaN(num) ? num : 0;
                             break;
                         case "string":
                         case "align":
                         case "color":
-                            rawObj[row['mappingName']] = args.value;
+                            rawObj[row['mappingName']] = args.value.toString();
                             break;
                         case "bool":
-                            rawObj[row['mappingName']] = args.value == 'true' ? true : false;
+                            rawObj[row['mappingName']] = args.value.toString() == 'true' ? true : false;
                             break;
                     }
                 }
@@ -284,21 +284,20 @@ export class PropertyEditor {
                 let found = this.dataSource.find((element: IDataSource): boolean => {
                     return element.property == property.groupName;
                 });
-                if (found) {
-                    if (!found.children) found.children = [];
-                    found.children.push({ property: property.showName, value: rawObj[property.propertyName], type: property.type, mappingName: property.propertyName });
-                    let valueStr = found.children[0].value;
-                    for (let i = 1; i < found.children.length; i++) {
-                        const child = found.children[i];
-                        valueStr += ', ' + child.value;
-                    }
-                    found.value = valueStr;
-                    found.type = 'string';
-                    found.mappingName = undefined;
-                } else {
-                    let newGroup: IDataSource = { property: property.groupName, value: '', type: 'string', children: [] };
-                    this.dataSource.push(newGroup);
+                if (!found) {
+                    found = { property: property.groupName, value: '', type: 'string', children: [] };
+                    this.dataSource.push(found);
                 }
+                if (!found.children) found.children = [];
+                found.children.push({ property: property.showName, value: rawObj[property.propertyName], type: property.type, mappingName: property.propertyName });
+                let valueStr = found.children[0].value;
+                for (let i = 1; i < found.children.length; i++) {
+                    const child = found.children[i];
+                    valueStr += ', ' + child.value;
+                }
+                found.value = valueStr;
+                found.type = 'string';
+                found.mappingName = undefined;
             } else {
                 let found = this.dataSource.find((element: IDataSource): boolean => {
                     return element.property == property.showName;
@@ -324,11 +323,22 @@ export class PropertyEditor {
                 let rows = this.gridComponent.getRows();
                 for (let i = 0; i < rows.length; i++) {
                     const row = rows[i] as any;
+                    if (row.records) {
+                        for (let j = 0; j < row.records.length; j++) {
+                            const record = row.records[j];
+                            if (record['mappingName'] == propertyName) {
+                                this.externalModifying = true;
+                                this.gridComponent.setCellValue(this.gridComponent.getKey(record), 'value', newVal.toString());
+                                this.externalModifying = false;
+                                return;
+                            }
+                        }
+                    }
                     if (row['mappingName'] == propertyName) {
                         this.externalModifying = true;
                         this.gridComponent.setCellValue(this.gridComponent.getKey(row), 'value', newVal.toString());
                         this.externalModifying = false;
-                        break;
+                        return;
                     }
                 }
             }
