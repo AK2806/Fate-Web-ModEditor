@@ -707,7 +707,7 @@ declare module jqwidgets {
         render(): void;
         toggle(): void;
         uncheck(): void;
-        val(value: boolean): boolean;
+        val(value?: boolean): boolean;
     }// jqxCheckBox
 
     export interface ColorPickerOptions {
@@ -1457,7 +1457,7 @@ declare module jqwidgets {
         uncheckIndex(index: number): void;
         uncheckItem(item: any): void;
         uncheckAll(): void;
-        val(value: string): string;
+        val(value?: string): string;
     }// jqxDropDownList
 
     export interface EditorLocalization {
@@ -2344,7 +2344,7 @@ declare module jqwidgets {
         destroy(): void;
         focus(): void;
         selectAll(): void;
-        val(value: number | string): string;
+        val(value?: number | string): string;
     }// jqxInput
 
     export interface KanbanColumns {

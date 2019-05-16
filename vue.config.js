@@ -1,3 +1,7 @@
 module.exports = {
-  publicPath: '/trpgfate/'
+  publicPath: '/trpgfate/',
+  runtimeCompiler: true,
+  devServer: {
+    port: 9000
+  }
 }

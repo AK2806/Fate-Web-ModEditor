@@ -185,25 +185,16 @@
     </jqx-menu>
     <jqx-docking-layout theme="metrodark" ref="layout" :width="jqxLayout.width" :height="jqxLayout.height" :layout="jqxLayout.layout">
         <div data-container="ResourcePanel">
-          <div id="resource-controller" style="display: flex; height: 40px;">
-            <button type="button" id="add-file-button"></button>
-            <button type="button" id="add-folder-button"></button>
-            <input type="file" accept="image/png" multiple id="file-input" style="display: none;" />
-            <button type="button" id="remove-button"></button>
-          </div>
-          <div style="position: absolute; left:0; bottom: 500px; top: 40px; right: 0;">
-            <div id="resource-manager"></div>
-          </div>
-          <div style="position: absolute; left:0; bottom: 0; right: 0; height: 500px;">
-            <img id="resource-image-preview" style="height: 99%;"/>
-          </div>
+          <resource-manager ref="resourceManager"></resource-manager>
         </div>
-        <div data-container="Document1Panel">
+        <div data-container="DocumentPanel">
           
         </div>
         <div data-container="OutputPanel">Output</div>
         <div data-container="SolutionExplorerPanel"></div>
-        <div data-container="PropertiesPanel">List of properties</div>
+        <div data-container="PropertiesPanel">
+          <div id="property-editor"></div>
+        </div>
     </jqx-docking-layout>
     <input-dialog ref="inputDialog"></input-dialog>
     <confirm-dialog ref="confirmDialog"></confirm-dialog>
@@ -221,9 +212,28 @@ import JqxMenu from "jqwidgets-scripts/jqwidgets-vue/vue_jqxmenu.vue";
 import JqxDockingLayout from "jqwidgets-scripts/jqwidgets-vue/vue_jqxdockinglayout.vue";
 import JqxWindow from "jqwidgets-scripts/jqwidgets-vue/vue_jqxwindow.vue";
 import JqxButton from "jqwidgets-scripts/jqwidgets-vue/vue_jqxbuttons.vue";
-import {IResourceItem, ResourceManagerView, DefaultResourceManagerModel} from "./components/ResourceManager";
 import InputDialog from "./components/InputDialog.vue";
 import ConfirmDialog from "./components/ConfirmDialog.vue";
+import ResourceManager from './components/ResourceManager.vue';
+import {PropertyEditor,IPropertyContainer,IProperty} from './components/PropertyEditor';
+
+class PropertyEditorTestCase extends IPropertyContainer {
+  private _x: number = 0;
+
+  get x(): number {
+    return this._x;
+  }
+
+  set x(val: number) {
+    let oldVal = this._x;
+    this._x = val;
+    this.propertyUpdated('x', oldVal, val);
+  }
+
+  getWatchedProperties(): IProperty[] {
+    return [ { propertyName: 'x', type: 'number', showName: 'X值' } ];
+  }
+}
 
 @Component({
   components: {
@@ -231,6 +241,7 @@ import ConfirmDialog from "./components/ConfirmDialog.vue";
     "jqx-docking-layout": JqxDockingLayout,
     "jqx-window": JqxWindow,
     "jqx-button": JqxButton,
+    "resource-manager": ResourceManager,
     "input-dialog": InputDialog,
     "confirm-dialog": ConfirmDialog
   }
@@ -240,8 +251,8 @@ export default class App extends Vue {
   userId: number = -1;
   avatarUrl: string = "";
   axiosInst: AxiosInstance;
-  resourceManager: ResourceManagerView = new ResourceManagerView();
-  resourceModel: DefaultResourceManagerModel = new DefaultResourceManagerModel();
+  propertyEditor: PropertyEditor = new PropertyEditor();
+  testCase: PropertyEditorTestCase = new PropertyEditorTestCase();
 
   jqxLayout: any = {
     width: "100%",
@@ -260,98 +271,19 @@ export default class App extends Vue {
                 title: "资源面板",
                 contentContainer: "ResourcePanel",
                 initContent: () => {
-                  this.resourceManager.initView('#resource-manager');
-                  this.resourceManager.setModel(this.resourceModel);
-                  this.resourceManager.addSelectEventListener(e => {
-                    let data = e.selectedItem.getData();
-                    if (data != null) {
-                      let fileReader = new FileReader();
-                      fileReader.readAsDataURL(data);
-                      fileReader.onload = (e: any) => {
-                        ($('#resource-image-preview').get(0) as HTMLImageElement).src = e.target.result;
-                      };
-                    }
-                  });
-                  jqwidgets.createInstance('#resource-controller>#add-file-button', 'jqxButton', { width: 120, height: 40, value: '导入', theme:'metrodark' });
-                  jqwidgets.createInstance('#resource-controller>#add-folder-button', 'jqxButton', { width: 120, height: 40, value: '创建文件夹', theme:'metrodark' });
-                  jqwidgets.createInstance('#resource-controller>#remove-button', 'jqxButton', { width: 120, height: 40, value: '删除', theme:'metrodark' });
-                  $('#resource-controller>#add-file-button').click(() => {
-                    $('#resource-controller>#file-input').click();
-                  });
-                  $('#resource-controller>#file-input').change(event => {
-                    let item = this.resourceManager.getSelectedItem();
-                    if (item != null) {
-                      if (item.getData() != null) {
-                        let folder = item.getParent() as IResourceItem;
-                        let files = <FileList>(<any>event.target).files;
-                        for (let i = 0; i < files.length; ++i) {
-                          let file = files.item(i);
-                          if (file != null) {
-                            this.resourceModel.attachResource(folder.getFullPath(), file.name, 'file-image', file);
-                          }
-                        }
-                      } else {
-                        let files = <FileList>(<any>event.target).files;
-                        for (let i = 0; i < files.length; ++i) {
-                          let file = files.item(i);
-                          if (file != null) {
-                            this.resourceModel.attachResource(item.getFullPath(), file.name, 'file-image', file);
-                          }
-                        }
-                      }
-                    } else {
-                      let files = <FileList>(<any>event.target).files;
-                      for (let i = 0; i < files.length; ++i) {
-                        let file = files.item(i);
-                        if (file != null) {
-                          this.resourceModel.attachResource("custom_resource", file.name, 'file-image', file);
-                        }
-                      }
-                    }
-                  });
-                  $('#resource-controller>#add-folder-button').click(() => {
-                    let inputDialog = this.$refs['inputDialog'] as InputDialog;
-                    let promise = inputDialog.show('文件夹名：', '创建文件夹', '未命名文件夹');
-                    if (promise != null) {
-                      promise.then(t => {
-                        let text = t as string;
-                        if (text == '') {
-                          let confirmDialog = this.$refs['confirmDialog'] as ConfirmDialog;
-                          confirmDialog.show("文件夹名不能为空", "警告", "warning");
-                          return;
-                        }
-                        let item = this.resourceManager.getSelectedItem();
-                        if (item != null) {
-                          if (item.getData() != null) {
-                            let folder = item.getParent() as IResourceItem;
-                            this.resourceModel.createFolder(folder.getFullPath(), text);
-                          } else {
-                            this.resourceModel.createFolder(item.getFullPath(), text);
-                          }
-                        } else {
-                          this.resourceModel.createFolder("custom_resource", text);
-                        }
-                      }).catch(() => {});
-                    }
-                  });
-                  $('#resource-controller>#remove-button').click(() => {
-                    let selectedPath = this.resourceManager.getSelectedItemPath();
-                    if (selectedPath != null) {
-                      this.resourceModel.deleteNode(selectedPath);
-                    }
-                  });
+                  (this.$refs['resourceManager'] as any).initView();
                 }
               }
             ]
           },
           {
-            type: "documentGroup",
+            type: "tabbedGroup",
             width: "60%",
             items: [
               {
-                type: "documentPanel",
-                title: "故事场景",
-                contentContainer: "Document1Panel",
+                type: "layoutPanel",
+                title: "场景编辑",
+                contentContainer: "DocumentPanel",
               }
             ]
           },
@@ -366,7 +298,7 @@ export default class App extends Vue {
                 items: [
                   {
                     type: "layoutPanel",
-                    title: "Solution Explorer",
+                    title: "场景列表",
                     contentContainer: "SolutionExplorerPanel",
                   }
                 ]
@@ -377,8 +309,16 @@ export default class App extends Vue {
                 items: [
                   {
                     type: "layoutPanel",
-                    title: "Properties",
-                    contentContainer: "PropertiesPanel"
+                    title: "属性",
+                    contentContainer: "PropertiesPanel",
+                    initContent: () => {
+                      this.propertyEditor.initView('#property-editor');
+                      this.propertyEditor.bindObject(this.testCase);
+                      setInterval(() => {
+                        console.log(this.testCase);
+                        this.testCase.x += 1;
+                      }, 1000);
+                    }
                   }
                 ]
               },
