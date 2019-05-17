@@ -24,72 +24,19 @@
     <jqx-menu theme="metrodark">
       <ul>
         <li>
-          文件
+          模组
           <ul style="width: 250px;">
             <li>
-              <a href="javascript:void(0)">新建模组</a>
+              <a href="javascript:void(0)">新建</a>
             </li>
             <li>
-              <a href="javascript:void(0)">打开模组</a>
+              <a href="javascript:void(0)">打开</a>
             </li>
             <li>
               <a href="javascript:void(0)">保存</a>
             </li>
             <li>
               <a href="javascript:void(0)">发布</a>
-            </li>
-          </ul>
-        </li>
-        <li>
-          编辑
-          <ul style="width: 250px;">
-            <li>
-              <a href="#Education">撤销</a>
-            </li>
-            <li>
-              <a href="#Financial">重做</a>
-            </li>
-            <li type="separator"></li>
-            <li>
-              <a href="#Government">剪切</a>
-            </li>
-            <li>
-              <a href="#Manufacturing">复制</a>
-            </li>
-            <li>
-              <a href="#Government">粘贴</a>
-            </li>
-          </ul>
-        </li>
-        <li>
-          视图
-          <ul>
-            <li>
-              <a href="#PCProducts">资源管理器</a>
-            </li>
-            <li>
-              <a href="#AllProducts">剧情树</a>
-            </li>
-            <li>
-              <a href="#AllProducts">NPC编辑器</a>
-            </li>
-            <li type="separator"></li>
-            <li>
-              <a href="#PCProducts">场景布局器</a>
-            </li>
-            <li>
-              <a href="javascript:void(0)">动作编辑器</a>
-            </li>
-          </ul>
-        </li>
-        <li>
-          模组
-          <ul style="width: 200px;">
-            <li>
-              <a href="#SupportHome">脚本库</a>
-            </li>
-            <li>
-              <a href="#CustomerService">属性</a>
             </li>
           </ul>
         </li>
@@ -108,7 +55,11 @@
           <resource-manager ref="resourceManager"></resource-manager>
         </div>
         <div data-container="DocumentPanel">
-          
+          <div :id="`story-scene-controller`" style="display: flex; height: 40px;">
+            <button type="button" id="add-object-button"></button>
+            <button type="button" id="remove-object-button"></button>
+          </div>
+          <div id="story-scene-container"></div>
         </div>
         <div data-container="OutputPanel">Output</div>
         <div data-container="SolutionExplorerPanel"></div>
@@ -136,51 +87,7 @@ import InputDialog from "./components/InputDialog.vue";
 import ConfirmDialog from "./components/ConfirmDialog.vue";
 import ResourceManager from './components/ResourceManager.vue';
 import {PropertyEditor,IPropertyContainer,IProperty} from './components/PropertyEditor';
-
-class PropertyEditorTestCase extends IPropertyContainer {
-  private _x: number = 0;
-  private _y: number = 0;
-
-  private _color: string = '#FFFFFF';
-
-  get x(): number {
-    return this._x;
-  }
-
-  set x(val: number) {
-    let oldVal = this._x;
-    this._x = val;
-    this.propertyUpdated('x', oldVal, val);
-  }
-
-  get y(): number {
-    return this._y;
-  }
-
-  set y(val: number) {
-    let oldVal = this._y;
-    this._y = val;
-    this.propertyUpdated('y', oldVal, val);
-  }
-
-  get color(): string {
-    return this._color;
-  }
-
-  set color(val: string) {
-    let oldVal = this._color;
-    this._color = val;
-    this.propertyUpdated('color', oldVal, val);
-  }
-
-  getWatchedProperties(): IProperty[] {
-    return [
-      { propertyName: 'x', type: 'number', showName: 'X', groupName: '位置' },
-      { propertyName: 'y', type: 'number', showName: 'Y', groupName: '位置' },
-      { propertyName: 'color', type: 'color', showName: '颜色'},
-    ];
-  }
-}
+import {StorySceneView,StorySceneModel,StoryGameObject,StoryGameCamera} from './components/StorySceneView';
 
 @Component({
   components: {
@@ -199,7 +106,8 @@ export default class App extends Vue {
   avatarUrl: string = "";
   axiosInst: AxiosInstance;
   propertyEditor: PropertyEditor = new PropertyEditor();
-  testCase: PropertyEditorTestCase = new PropertyEditorTestCase();
+  storySceneView: StorySceneView | null = null;
+  storySceneModel: StorySceneModel = new StorySceneModel();
 
   jqxLayout: any = {
     width: "100%",
@@ -231,6 +139,45 @@ export default class App extends Vue {
                 type: "layoutPanel",
                 title: "场景编辑",
                 contentContainer: "DocumentPanel",
+                initContent: () => {
+                  jqwidgets.createInstance(
+                    `#story-scene-controller>#add-object-button`,
+                    "jqxButton",
+                    { width: 120, height: 40, value: "创建对象", theme: "metrodark" }
+                  );
+                  jqwidgets.createInstance(
+                    `#story-scene-controller>#remove-object-button`,
+                    "jqxButton",
+                    { width: 120, height: 40, value: "移除对象", theme: "metrodark" }
+                  );
+                  $(`#story-scene-controller>#add-object-button`).click(() => {
+                    let selectedResource: Blob | null = (this.$refs['resourceManager'] as any).getSelectedResource();
+                    if (selectedResource != null) {
+                      let gameObject = new StoryGameObject((this.$refs['resourceManager'] as any).getSelectedItemPath());
+                      this.storySceneModel.addGameObject(gameObject);
+                    }
+                  });
+                  $(`#story-scene-controller>#remove-object-button`).click(() => {
+                    if (this.storySceneView != null) {
+                      let selectedObjectId = this.storySceneView.getSelectedGameObjectId();
+                      if (selectedObjectId != null && selectedObjectId != 'camera') {
+                        this.storySceneModel.removeGameObject(selectedObjectId);
+                      }
+                    }
+                  });
+                  this.storySceneView = new StorySceneView((this.$refs['resourceManager'] as any).resourceModel);
+                  this.storySceneView.initView('#story-scene-container');
+                  this.storySceneView.bindModel(this.storySceneModel);
+                  this.storySceneView.addSelectObjectListener((selectedObjectId: string | null) => {
+                    if (selectedObjectId == 'camera') {
+                      this.propertyEditor.bindObject(this.storySceneModel.camera);
+                    } else if (selectedObjectId != null) {
+                      this.propertyEditor.bindObject(this.storySceneModel.getGameObject(selectedObjectId) as StoryGameObject);
+                    } else {
+                      this.propertyEditor.bindObject(null);
+                    }
+                  });
+                }
               }
             ]
           },
@@ -260,11 +207,6 @@ export default class App extends Vue {
                     contentContainer: "PropertiesPanel",
                     initContent: () => {
                       this.propertyEditor.initView('#property-editor');
-                      this.propertyEditor.bindObject(this.testCase);
-                      setInterval(() => {
-                        console.log(this.testCase);
-                        this.testCase.x += 1;
-                      }, 1000);
                     }
                   }
                 ]

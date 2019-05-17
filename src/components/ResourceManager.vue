@@ -53,6 +53,18 @@ export default class ResourceManager extends Vue {
     this.uuid = uuid.v1().replace(/-/g, '')
   }
 
+  getSelectedItemPath(): string | null {
+    return this.resourceManager.getSelectedItemPath();
+  }
+
+  getSelectedResource(): Blob | null {
+    let selectedItem = this.resourceManager.getSelectedItem();
+    if (selectedItem != null) {
+      return selectedItem.getData();
+    }
+    return null;
+  }
+
   initView() {
     this.resourceManager.initView(`#resource-manager-${this.uuid}`);
     this.resourceManager.setModel(this.resourceModel);

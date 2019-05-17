@@ -272,43 +272,48 @@ export class PropertyEditor {
         }
     }
 
-    bindObject(obj: IPropertyContainer): void {
-        this.watchTarget = obj;
-        this.watchTarget.manager = this;
-        let properties = obj.getWatchedProperties();
-        let rawObj = obj as any;
-        this.dataSource = [];
-        for (let idx in properties) {
-            let property = properties[idx];
-            if (property.groupName) {
-                let found = this.dataSource.find((element: IDataSource): boolean => {
-                    return element.property == property.groupName;
-                });
-                if (!found) {
-                    found = { property: property.groupName, value: '', type: 'string', children: [] };
-                    this.dataSource.push(found);
-                }
-                if (!found.children) found.children = [];
-                found.children.push({ property: property.showName, value: rawObj[property.propertyName], type: property.type, mappingName: property.propertyName });
-                let valueStr = found.children[0].value;
-                for (let i = 1; i < found.children.length; i++) {
-                    const child = found.children[i];
-                    valueStr += ', ' + child.value;
-                }
-                found.value = valueStr;
-                found.type = 'string';
-                found.mappingName = undefined;
-            } else {
-                let found = this.dataSource.find((element: IDataSource): boolean => {
-                    return element.property == property.showName;
-                });
-                if (!found) {
-                    this.dataSource.push({ property: property.showName, value: rawObj[property.propertyName], type: property.type, mappingName: property.propertyName });
+    bindObject(obj: IPropertyContainer | null): void {
+        if (obj == null) {
+            this.watchTarget = null;
+            this.dataSource = [];
+        } else {
+            this.watchTarget = obj;
+            this.watchTarget.manager = this;
+            let properties = obj.getWatchedProperties();
+            let rawObj = obj as any;
+            this.dataSource = [];
+            for (let idx in properties) {
+                let property = properties[idx];
+                if (property.groupName) {
+                    let found = this.dataSource.find((element: IDataSource): boolean => {
+                        return element.property == property.groupName;
+                    });
+                    if (!found) {
+                        found = { property: property.groupName, value: '', type: 'string', children: [] };
+                        this.dataSource.push(found);
+                    }
+                    if (!found.children) found.children = [];
+                    found.children.push({ property: property.showName, value: rawObj[property.propertyName], type: property.type, mappingName: property.propertyName });
+                    let valueStr = found.children[0].value;
+                    for (let i = 1; i < found.children.length; i++) {
+                        const child = found.children[i];
+                        valueStr += ', ' + child.value;
+                    }
+                    found.value = valueStr;
+                    found.type = 'string';
+                    found.mappingName = undefined;
                 } else {
-                    found.value = rawObj[property.propertyName];
-                    found.type = property.type;
-                    found.mappingName = property.propertyName;
-                    found.children = undefined;
+                    let found = this.dataSource.find((element: IDataSource): boolean => {
+                        return element.property == property.showName;
+                    });
+                    if (!found) {
+                        this.dataSource.push({ property: property.showName, value: rawObj[property.propertyName], type: property.type, mappingName: property.propertyName });
+                    } else {
+                        found.value = rawObj[property.propertyName];
+                        found.type = property.type;
+                        found.mappingName = property.propertyName;
+                        found.children = undefined;
+                    }
                 }
             }
         }

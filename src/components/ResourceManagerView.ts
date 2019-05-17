@@ -86,7 +86,7 @@ export class ResourceManagerView implements IResourceManagerModelObserver {
         }
     }
 
-    clear(): void {
+    onClear(): void {
         if (this.treeComponent != null) {
             this.treeComponent.clear();
             this.treeComponent.render();
@@ -149,7 +149,7 @@ export interface IResourceManagerModelObserver {
     onResourceAdded(item: IResourceItem, parentPath?: string): void
     onResourceRemoved(path: string): void
     onResourceUpdated(item: IResourceItem): void
-    clear(): void;
+    onClear(): void;
 }
 
 export interface IResourceManagerModel {
@@ -370,7 +370,7 @@ export class DefaultResourceManagerModel implements IResourceManagerModel {
         let idx = this.observers.indexOf(observer);
         if (idx == -1) return;
         let observers = this.observers.splice(idx, 1);
-        observers[0].clear();
+        observers[0].onClear();
     }
 
     getResource(path: string): IResourceItem | null {
