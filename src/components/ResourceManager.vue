@@ -18,7 +18,7 @@
 </template>
 
 <script lang="ts">
-/// <reference path="./jqwidgets.d.ts" />
+/// <reference path="../jqwidgets.d.ts" />
 
 import $ from "jquery";
 import Vue from "vue";

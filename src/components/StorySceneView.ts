@@ -2,7 +2,11 @@ import $ from 'jquery';
 import uuid from 'uuid';
 import Konva from 'konva';
 import { IPropertyContainer, IProperty } from './PropertyEditor';
-import { IResourceManagerModel } from './ResourceManagerView';
+import {
+    IResourceItem,
+    IResourceManagerModel,
+    IResourceManagerModelObserver
+} from "./ResourceManagerView";
 
 function Tint(data: any) {
     let imageData = data as ImageData;
@@ -18,6 +22,8 @@ function Tint(data: any) {
 
 export class StorySceneView {
     private _uuid: string;
+    private _stageWidth: number = 1920;
+    private _stageHeight: number = 1080;
 
     private _stage: Konva.Stage | null = null;
     private _model: StorySceneModel | null = null;
@@ -25,7 +31,7 @@ export class StorySceneView {
     private _cameraLayer: Konva.Layer = new Konva.Layer();
     private _camera: Konva.Group | null = null;
     private _cameraRect: Konva.Rect | null = null;
-    private _resourceModel: IResourceManagerModel;
+    private _resourceModel: IResourceManagerModel | null = null;
 
     private _image2ObjectIdMap: Map<Konva.Image, string> = new Map();
     private _objectId2ImageMap: Map<string, Konva.Image> = new Map();
@@ -37,9 +43,8 @@ export class StorySceneView {
 
     private _selectedObjectId: string | null = null;
 
-    constructor(model: IResourceManagerModel) {
+    constructor() {
         this._uuid = uuid.v1();
-        this._resourceModel = model;
     }
 
     addSelectObjectListener(callback: (selectedGameObjectId: string | null) => void) {
@@ -146,12 +151,13 @@ export class StorySceneView {
         }
     }
 
-    initView(selector: string) {
+    initView(selector: string, resourceModel: IResourceManagerModel) {
         $(`<div id="story-scene-${this._uuid}"></div>`).appendTo($(selector));
+        this._resourceModel = resourceModel;
         this._stage = new Konva.Stage({
             container: `story-scene-${this._uuid}`,
-            width: 1920,
-            height: 1080
+            width: this._stageWidth,
+            height: this._stageHeight
         });
         this._stage.getContent().style.backgroundColor = 'black';
         this._stage.add(this._objectsLayer);
@@ -205,6 +211,7 @@ export class StorySceneView {
     }
 
     onGameObjectAdded(gameObject: StoryGameObject) {
+        if (this._resourceModel == null) return;
         let blob = this._resourceModel.getResource(gameObject.spritePath);
         if (blob != null) {
             let blobData = blob.getData();
@@ -340,7 +347,49 @@ export class StorySceneView {
     }
 }
 
-export class StorySceneModel {
+class InspectorItem implements IResourceItem {
+    readonly id: string;
+    icon: string = 'object';
+    label: string;
+    obj: StoryGameObject;
+
+    constructor(id: string, label: string, obj: StoryGameObject) {
+        this.id = id;
+        this.label = label;
+        this.obj = obj;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+    
+    getIcon(): string {
+        return this.icon;
+    }
+
+    getLabel(): string {
+        return this.label;
+    }
+
+    getData(): StoryGameObject {
+        return this.obj;
+    }
+
+    getParent(): IResourceItem | null {
+        return null;
+    }
+
+    getChildren(): IResourceItem[] {
+        return [];
+    }
+
+    getFullPath(): string {
+        return this.id;
+    }
+}
+
+export class StorySceneModel implements IResourceManagerModel {
+    private _inspectorObservers: IResourceManagerModelObserver[] = [];
     private _observers: StorySceneView[] = [];
 
     private _camera: StoryGameCamera = new StoryGameCamera();
@@ -355,6 +404,13 @@ export class StorySceneModel {
             const observer = this._observers[i];
             observer.onGameObjectValueChanged(id, property, value);
         }
+        if (property == 'name') {
+            for (let i = 0; i < this._inspectorObservers.length; i++) {
+                const observer = this._inspectorObservers[i];
+                let inspectorItem = this.getResource(id) as InspectorItem;
+                observer.onResourceUpdated(inspectorItem);
+            }
+        }
     }
 
     onCameraValueChanged(property: string, value: any) {
@@ -362,6 +418,30 @@ export class StorySceneModel {
             const observer = this._observers[i];
             observer.onCameraValueChanged(property, value);
         }
+    }
+
+    addDataObserver(observer: IResourceManagerModelObserver): void {
+        this._inspectorObservers.push(observer);
+        for (let [key, value] of this._objectsMap) {
+            for (let i = 0; i < this._inspectorObservers.length; i++) {
+                const observer = this._inspectorObservers[i];
+                let inspectorItem = new InspectorItem(key, value.name, value);
+                observer.onResourceAdded(inspectorItem);
+            }
+        }
+    }
+
+    removeDataObserver(observer: IResourceManagerModelObserver): void {
+        let idx = this._inspectorObservers.indexOf(observer);
+        if (idx == -1) return;
+        let observers = this._inspectorObservers.splice(idx, 1);
+        observers[0].onClear();
+    }
+    
+    getResource(path: string): IResourceItem | null {
+        let obj = this._objectsMap.get(path);
+        if (!obj) return null; 
+        return new InspectorItem(obj.id, obj.name, obj);
     }
 
     addObserver(view: StorySceneView): void {
@@ -398,6 +478,11 @@ export class StorySceneModel {
             const observer = this._observers[i];
             observer.onGameObjectAdded(gameObject);
         }
+        for (let i = 0; i < this._inspectorObservers.length; i++) {
+            const observer = this._inspectorObservers[i];
+            let inspectorItem = new InspectorItem(gameObject.id, gameObject.name, gameObject);
+            observer.onResourceAdded(inspectorItem);
+        }
     }
 
     removeGameObject(id: string): boolean {
@@ -409,6 +494,10 @@ export class StorySceneModel {
                 const observer = this._observers[i];
                 observer.onGameObjectRemoved(id);
             }
+            for (let i = 0; i < this._inspectorObservers.length; i++) {
+                const observer = this._inspectorObservers[i];
+                observer.onResourceRemoved(id);
+            }
         }
         return removed;
     }
@@ -418,6 +507,7 @@ export class StoryGameObject extends IPropertyContainer {
     container: StorySceneModel | null = null;
 
     private _id: string;
+    private _name: string = '未命名对象';
     private _x: number = 0;
     private _y: number = 0;
     private _zIndex: number = 0;
@@ -444,6 +534,7 @@ export class StoryGameObject extends IPropertyContainer {
 
     getWatchedProperties(): IProperty[] {
         return [
+            { propertyName: 'name', type: 'string', showName: '名称' },
             { propertyName: 'x', type: 'number', showName: 'X', groupName: '位置' },
             { propertyName: 'y', type: 'number', showName: 'Y', groupName: '位置' },
             { propertyName: 'angle', type: 'number', showName: '旋转' },
@@ -456,6 +547,10 @@ export class StoryGameObject extends IPropertyContainer {
 
     get id(): string {
         return this._id;
+    }
+
+    get name(): string {
+        return this._name;
     }
 
     get x(): number {
@@ -500,6 +595,12 @@ export class StoryGameObject extends IPropertyContainer {
 
     get spritePath(): string {
         return this._spritePath;
+    }
+
+    set name(val: string) {
+        let oldVal = this._name;
+        this._name = val;
+        this.valueUpdated('name', oldVal, val);
     }
 
     set x(val: number) {

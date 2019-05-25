@@ -37,6 +37,8 @@ export class ResourceManagerView implements IResourceManagerModelObserver {
                 return require('../assets/icons/icons8-image-file.svg');
             case 'file-raw':
                 return require('../assets/icons/icons8_file.svg');
+            case 'object':
+                return require('../assets/icons/cube.svg');
             default:
                 return undefined;
         }
@@ -98,8 +100,8 @@ export class ResourceManagerView implements IResourceManagerModelObserver {
             this.treeComponent.destroy();
         }
         this.treeComponent = jqwidgets.createInstance(selector, 'jqxTree', {
-            width: '100%',
-            height: '100%',
+            width: '99%',
+            height: '99%',
             theme: "metrodark",
             allowDrag: true,
             allowDrop: false
@@ -143,6 +145,18 @@ export class ResourceManagerView implements IResourceManagerModelObserver {
         }
         return null;
     }
+
+    selectItem(path: string | null) : void {
+        if (this.treeComponent != null) {
+            if (path == null) {
+                this.treeComponent.selectItem(undefined);
+            } else {
+                let selector = this.getSelectorFromPath(path);
+                this.treeComponent.selectItem($(selector).get(0));
+            }
+            this.treeComponent.render();
+        }
+    }
 }
 
 export interface IResourceManagerModelObserver {
@@ -162,7 +176,7 @@ export interface IResourceItem {
     getId(): string;
     getIcon(): string;
     getLabel(): string;
-    getData(): Blob | null;
+    getData(): any;
     getParent(): IResourceItem | null;
     getChildren(): IResourceItem[];
     getFullPath(): string;

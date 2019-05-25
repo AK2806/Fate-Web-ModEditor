@@ -61,8 +61,9 @@
           </div>
           <div id="story-scene-container"></div>
         </div>
-        <div data-container="OutputPanel">Output</div>
-        <div data-container="SolutionExplorerPanel"></div>
+        <div data-container="ObjectInspectPanel">
+          <div id="object-inspector"></div>
+        </div>
         <div data-container="PropertiesPanel">
           <div id="property-editor"></div>
         </div>
@@ -88,6 +89,13 @@ import ConfirmDialog from "./components/ConfirmDialog.vue";
 import ResourceManager from './components/ResourceManager.vue';
 import {PropertyEditor,IPropertyContainer,IProperty} from './components/PropertyEditor';
 import {StorySceneView,StorySceneModel,StoryGameObject,StoryGameCamera} from './components/StorySceneView';
+import uuid from "uuid";
+
+import {
+  IResourceItem,
+  ResourceManagerView,
+  ResourceManagerViewSelectEvent
+} from "./components/ResourceManagerView";
 
 @Component({
   components: {
@@ -106,8 +114,9 @@ export default class App extends Vue {
   avatarUrl: string = "";
   axiosInst: AxiosInstance;
   propertyEditor: PropertyEditor = new PropertyEditor();
-  storySceneView: StorySceneView | null = null;
+  storySceneView: StorySceneView = new StorySceneView();
   storySceneModel: StorySceneModel = new StorySceneModel();
+  storySceneInspector: ResourceManagerView = new ResourceManagerView();
 
   jqxLayout: any = {
     width: "100%",
@@ -165,16 +174,18 @@ export default class App extends Vue {
                       }
                     }
                   });
-                  this.storySceneView = new StorySceneView((this.$refs['resourceManager'] as any).resourceModel);
-                  this.storySceneView.initView('#story-scene-container');
+                  this.storySceneView.initView('#story-scene-container', (this.$refs['resourceManager'] as any).resourceModel);
                   this.storySceneView.bindModel(this.storySceneModel);
                   this.storySceneView.addSelectObjectListener((selectedObjectId: string | null) => {
                     if (selectedObjectId == 'camera') {
                       this.propertyEditor.bindObject(this.storySceneModel.camera);
+                      this.storySceneInspector.selectItem(null);
                     } else if (selectedObjectId != null) {
                       this.propertyEditor.bindObject(this.storySceneModel.getGameObject(selectedObjectId) as StoryGameObject);
+                      this.storySceneInspector.selectItem(selectedObjectId);
                     } else {
                       this.propertyEditor.bindObject(null);
+                      this.storySceneInspector.selectItem(null);
                     }
                   });
                 }
@@ -188,18 +199,28 @@ export default class App extends Vue {
             items: [
               {
                 type: "tabbedGroup",
-                height: "35%",
+                height: "40%",
                 items: [
                   {
                     type: "layoutPanel",
-                    title: "场景列表",
-                    contentContainer: "SolutionExplorerPanel",
+                    title: "场景对象列表",
+                    contentContainer: "ObjectInspectPanel",
+                    initContent: () => {
+                      console.log('123213');
+                      this.storySceneInspector.initView('#object-inspector');
+                      this.storySceneInspector.setModel(this.storySceneModel);
+                      this.storySceneInspector.addSelectEventListener((e : ResourceManagerViewSelectEvent) => {
+                        if (this.storySceneView != null) {
+                          this.storySceneView.selectGameObject(e.selectedItem.getId());
+                        }
+                      })
+                    }
                   }
                 ]
               },
               {
                 type: "tabbedGroup",
-                height: "65%",
+                height: "60%",
                 items: [
                   {
                     type: "layoutPanel",
