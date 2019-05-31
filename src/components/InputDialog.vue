@@ -67,14 +67,15 @@ export default class ConfirmDialog extends Vue {
 
     show(content: string, title: string, defaultText?: string): Promise<string | null> | null {
         if (this.resolve == null && this.reject == null) {
+            let ret: Promise<string | null> = new Promise((resolve, reject) => {
+                this.resolve = resolve;
+                this.reject = reject;
+            });
             (<any>this.$refs['dialog']).setTitle(title);
             this.content = content;
             this.inputText = defaultText ? defaultText : '';
             (<any>this.$refs['dialog']).open();
-            return new Promise((resolve, reject) => {
-                this.resolve = resolve;
-                this.reject = reject;
-            });
+            return ret;
         }
         return null;
     }

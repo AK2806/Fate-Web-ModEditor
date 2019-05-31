@@ -1,0 +1,13 @@
+import 'bootstrap';
+import 'bootstrap/dist/css/bootstrap.css';
+import 'font-awesome/css/font-awesome.css';
+import './assets/css/fontastic.css';
+import './assets/css/poppins.css';
+import './assets/css/general.css';
+import './assets/css/theme.css';
+import './assets/css/console.css';
+import Axios from 'axios';
+global.apiUrlPrefix = 'http://localhost:8080/';
+Axios.defaults.baseURL = apiUrlPrefix;
+Axios.defaults.withCredentials = true;
+Axios.defaults.headers.common['Content-Type'] = 'application/json';

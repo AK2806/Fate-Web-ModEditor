@@ -222,40 +222,42 @@ export class StorySceneView {
                     let imageElement = new Image();
                     imageElement.src = e.target.result;
                     imageElement.onload = () => {
-                        if (this._stage != null) {
-                            let image = new Konva.Image({
-                                x: this._stage.width() / 2,
-                                y: this._stage.height() / 2,
-                                image: imageElement,
-                                draggable: true,
-                                transformable: true,
-                                tintRed: 255,
-                                tintGreen: 255,
-                                tintBlue: 255
-                            });
-                            image.on('transformstart', () => {
-                                this.imageTransformed(image);
-                            });
-                            image.on('dragstart', () => {
-                                this.selectGameObject(gameObject.id);
-                            });
-                            image.on('dragmove', () => {
-                                this.imageTransformed(image);
-                            });
-                            image.on('transform', () => {
-                                this.imageTransformed(image);
-                            });
-                            image.on('transformend', () => {
-                                this.imageTransformed(image);
-                            });
-                            image.cache(undefined);
-                            image.filters([Tint]);
-                            this._objectsLayer.add(image);
-                            this._objectsLayer.draw();
-                            this._objectId2ImageMap.set(gameObject.id, image);
-                            this._image2ObjectIdMap.set(image, gameObject.id);
+                        let image = new Konva.Image({
+                            x: gameObject.x,
+                            y: gameObject.y,
+                            rotation: gameObject.angle,
+                            scaleX: gameObject.sclX,
+                            scaleY: gameObject.sclY,
+                            image: imageElement,
+                            draggable: true,
+                            transformable: true,
+                            tintRed: gameObject.colorR,
+                            tintGreen: gameObject.colorG,
+                            tintBlue: gameObject.colorB
+                        });
+                        image.on('transformstart', () => {
+                            this.imageTransformed(image);
+                        });
+                        image.on('dragstart', () => {
                             this.selectGameObject(gameObject.id);
-                        }
+                        });
+                        image.on('dragmove', () => {
+                            this.imageTransformed(image);
+                        });
+                        image.on('transform', () => {
+                            this.imageTransformed(image);
+                        });
+                        image.on('transformend', () => {
+                            this.imageTransformed(image);
+                        });
+                        image.cache(undefined);
+                        image.filters([Tint]);
+                        this._objectsLayer.add(image);
+                        image.setZIndex(gameObject.zIndex);
+                        this._objectsLayer.draw();
+                        this._objectId2ImageMap.set(gameObject.id, image);
+                        this._image2ObjectIdMap.set(image, gameObject.id);
+                        this.selectGameObject(gameObject.id);
                     }
                 }
             }
@@ -388,6 +390,27 @@ class InspectorItem implements IResourceItem {
     }
 }
 
+export class StoryScenePersistentData {
+    camera: {
+        x: number,
+        y: number,
+        scl: number
+    } = { x: 0, y: 0, scl: 0 };
+    objects: {
+        id: string,
+        name: string,
+        x: number,
+        y: number,
+        zIndex: number,
+        angle: number,
+        sclX: number,
+        sclY: number,
+        color: string,
+        spritePath: string,
+        characterUuid: string
+    } [] = [];
+}
+
 export class StorySceneModel implements IResourceManagerModel {
     private _inspectorObservers: IResourceManagerModelObserver[] = [];
     private _observers: StorySceneView[] = [];
@@ -397,6 +420,53 @@ export class StorySceneModel implements IResourceManagerModel {
 
     constructor() {
         this._camera.container = this;
+    }
+
+    getPersistentData(): StoryScenePersistentData {
+        let ret = new StoryScenePersistentData();
+        ret.camera = {
+            x: this._camera.x,
+            y: this._camera.y,
+            scl: this._camera.scl
+        };
+        for (let [key, value] of this._objectsMap) {
+            let object = {
+                id: value.id,
+                name: value.name,
+                x: value.x,
+                y: value.y,
+                zIndex: value.zIndex,
+                angle: value.angle,
+                sclX: value.sclX,
+                sclY: value.sclY,
+                color: value.color,
+                spritePath: value.spritePath,
+                characterUuid: value.characterUuid
+            };
+            ret.objects.push(object);
+        }
+        return ret;
+    }
+
+    applyPersistentData(data: StoryScenePersistentData): void {
+        this.clear();
+        this._camera.x = data.camera.x;
+        this._camera.y = data.camera.y;
+        this._camera.scl = data.camera.scl;
+        for (let i = 0; i < data.objects.length; i++) {
+            const obj = data.objects[i];
+            let gameObject = new StoryGameObject(obj.spritePath, obj.id);
+            gameObject.name = obj.name;
+            gameObject.x = obj.x;
+            gameObject.y = obj.y;
+            gameObject.zIndex = obj.zIndex;
+            gameObject.angle = obj.angle;
+            gameObject.sclX = obj.sclX;
+            gameObject.sclY = obj.sclY;
+            gameObject.color = obj.color;
+            gameObject.characterUuid = obj.characterUuid;
+            this.addGameObject(gameObject);
+        }
     }
 
     onGameObjectValueChanged(id: string, property: string, value: any) {
@@ -501,6 +571,17 @@ export class StorySceneModel implements IResourceManagerModel {
         }
         return removed;
     }
+
+    clear(): void {
+        let objectsId: string[] = [];
+        for (let [key, value] of this._objectsMap) {
+            objectsId.push(key);
+        }
+        for (let i = 0; i < objectsId.length; i++) {
+            const id = objectsId[i];
+            this.removeGameObject(id);
+        }
+    }
 }
 
 export class StoryGameObject extends IPropertyContainer {
@@ -514,14 +595,15 @@ export class StoryGameObject extends IPropertyContainer {
     private _angle: number = 0;
     private _sclX: number = 1;
     private _sclY: number = 1;
-    private _colorR: number = 1;
-    private _colorG: number = 1;
-    private _colorB: number = 1;
+    private _colorR: number = 255;
+    private _colorG: number = 255;
+    private _colorB: number = 255;
     private _spritePath: string;
+    private _characterUuid: string = '';
 
-    constructor(spritePath: string) {
+    constructor(spritePath: string, customId?: string) {
         super();
-        this._id = uuid.v1();
+        this._id = customId ? customId : uuid.v1();
         this._spritePath = spritePath;
     }
 
@@ -597,6 +679,10 @@ export class StoryGameObject extends IPropertyContainer {
         return this._spritePath;
     }
 
+    get characterUuid(): string {
+        return this._characterUuid;
+    }
+
     set name(val: string) {
         let oldVal = this._name;
         this._name = val;
@@ -648,6 +734,10 @@ export class StoryGameObject extends IPropertyContainer {
             this._colorB = parseInt(result[3], 16);
             this.valueUpdated('color', oldVal, val);
         }
+    }
+
+    set characterUuid(val: string) {
+        this._characterUuid = val;
     }
 }
 
